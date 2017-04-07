@@ -40,23 +40,18 @@
     </script>
 
     <script type="x-shader/x-vertex" id="vertexShader2">
+        uniform float waveParam;
         attribute vec3 offset;
         attribute float rotation;
         float ifgt(float x, float y);
 
         // add wave adjustment before rotating
-        // radius is 
+        // radius is position.x
         void main() {
-            /*
-            var tempRadius = radius + Math.sin(theta * i * 10);
-            cVertices[i * 3] = tempRadius * Math.cos(theta * i);
-            cVertices[i * 3 + 1] = 0;
-            cVertices[i * 3 + 2] = tempRadius * Math.sin(theta * i);
-            */
-
-            // added temporary scale adjustment
             vec3 ap = position;
-            ap.x = position.x - sin(rotation * 8.0) * ifgt(position.x, 0.0) * position.x / 10.0;
+
+            // temporary scale adjustment
+            ap.x = position.x - sin(rotation * waveParam) * ifgt(position.x, 0.0) * position.x / 10.0;
 
             float sinTheta = sin(rotation);
             float cosTheta = cos(rotation);
@@ -111,18 +106,19 @@
             var cSegments = 128;
             var radius = 10;
             var nCircles = 51;
+            var waveParam = 8;
 
             var cGeometry = new THREE.BufferGeometry();
             var cVertices = new Float32Array((cSegments + 1) * 3);
             var thetaStep = 2 * Math.PI / cSegments;
 
-            // move to vs?
+            // move radius adjustment to vs?
+            // cw along xz
             for (var i = 0; i <= cSegments; i++) {
-                //var tempRadius = radius;
-                var tempRadius = radius + Math.sin(thetaStep * i * 8);
-                cVertices[i * 3] = tempRadius * Math.cos(thetaStep * i);
+                var adjustedRadius = radius + Math.sin(thetaStep * i * waveParam);
+                cVertices[i * 3] = adjustedRadius * Math.cos(thetaStep * i);
                 cVertices[i * 3 + 1] = 0;
-                cVertices[i * 3 + 2] = tempRadius * Math.sin(thetaStep * i);
+                cVertices[i * 3 + 2] = adjustedRadius * Math.sin(thetaStep * i);
             }
             cGeometry.addAttribute('position', new THREE.BufferAttribute(cVertices, 3));
 
@@ -193,6 +189,9 @@
 
             var vs2 = document.getElementById("vertexShader2").textContent;
             var lMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    waveParam: { value: waveParam }
+                },
                 vertexShader: vs2,
                 fragmentShader: fs
             });
