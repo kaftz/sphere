@@ -25,10 +25,10 @@
 </head>
 <body>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/84/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.3.0/math.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r16/Stats.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.3/dat.gui.min.js"></script>
     <script src="js/OrbitControls.js"></script>
-    <script src="js/gpocean.js"></script>
+    <script src="js/sphere.js"></script>
 
     <script type="x-shader/x-vertex" id="vertexShader">
         attribute vec3 offset;
@@ -69,8 +69,9 @@
     </script>
 
     <script type="x-shader/x-fragment" id="fragmentShader">
+        uniform vec3 cColor;
         void main() {
-            gl_FragColor = vec4(0.0);
+            gl_FragColor = vec4(cColor, 0.4);
         }
     </script>
 
@@ -78,7 +79,7 @@
         var testCanvas = document.createElement("canvas");
         var testContext = testCanvas.getContext("webgl") || testCanvas.getContext("experimental-webgl");
         var webGL = !!(window.WebGLRenderingContext && testContext);
-        var camera, scene, renderer, orbit, stats, patch, ig;
+        var camera, scene, renderer, orbit, stats, gui;
 
         if (webGL && testContext.getExtension("ANGLE_instanced_arrays")) {
             setup();
@@ -103,102 +104,16 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xffffff);
 
-            var cSegments = 128;
-            var radius = 10;
-            var nCircles = 51;
-            var waveParam = 8;
+            var sphere = new Sphere();
+            scene.add(sphere.cMesh);
+            scene.add(sphere.cMesh2);
+            scene.add(sphere.lMesh);
 
-            var cGeometry = new THREE.BufferGeometry();
-            var cVertices = new Float32Array((cSegments + 1) * 3);
-            var thetaStep = 2 * Math.PI / cSegments;
-
-            // move radius adjustment to vs?
-            // cw along xz
-            for (var i = 0; i <= cSegments; i++) {
-                var adjustedRadius = radius + Math.sin(thetaStep * i * waveParam);
-                cVertices[i * 3] = adjustedRadius * Math.cos(thetaStep * i);
-                cVertices[i * 3 + 1] = 0;
-                cVertices[i * 3 + 2] = adjustedRadius * Math.sin(thetaStep * i);
-            }
-            cGeometry.addAttribute('position', new THREE.BufferAttribute(cVertices, 3));
-
-            var cOffsets = new Float32Array(nCircles * 3);
-            var cOffsetStep = 2 * radius / (nCircles + 1);
-            for (var i = 0; i < nCircles; i++) {
-                cOffsets[i * 3] = 0;
-                cOffsets[i * 3 + 1] = radius - (i + 1) * cOffsetStep;
-                cOffsets[i * 3 + 2] = 0;
-            }
-
-            var cScales = new Float32Array(nCircles);
-            for (var i = 0; i < nCircles; i++) {
-                var theta = Math.asin(cOffsets[i * 3 + 1] / radius);
-                cScales[i] = Math.cos(theta);
-            }
-
-            var cig = new THREE.InstancedBufferGeometry();
-            cig.copy(cGeometry);
-            cig.addAttribute("offset", new THREE.InstancedBufferAttribute(cOffsets, 3));
-            cig.addAttribute("scale", new THREE.InstancedBufferAttribute(cScales, 1));
-
-            var vs = document.getElementById("vertexShader").textContent;
-            var fs = document.getElementById("fragmentShader").textContent;
-            var cMaterial = new THREE.ShaderMaterial({
-                vertexShader: vs,
-                fragmentShader: fs
+            // init gui
+            gui = new dat.GUI();
+            gui.add(sphere, "nCircles", 5, 51).step(1).onChange(function() {
+                sphere.updateCIGAttrs();
             });
-            var cMesh = new THREE.Line(cig, cMaterial);
-            scene.add(cMesh);
-
-            // vertical lines, using 2x nCircles
-            var nLines = nCircles * 2;
-            var lGeometry = new THREE.BufferGeometry();
-            var lVertices = new Float32Array((nCircles + 2) * 3);
-
-            // may reuse scale calcs here
-            lVertices[0] = 0;
-            lVertices[1] = radius;
-            lVertices[2] = 0;
-            lVertices[(nCircles + 1) * 3] = 0;
-            lVertices[(nCircles + 1) * 3 + 1] = -radius;
-            lVertices[(nCircles + 1) * 3 + 2] = 0;
-            for (var i = 0; i < nCircles; i++) {
-                lVertices[(i + 1) * 3] = cScales[i] * radius; 
-                lVertices[(i + 1) * 3 + 1] = cOffsets[i * 3 + 1];
-                lVertices[(i + 1) * 3 + 2] = 0;
-            }
-            lGeometry.addAttribute('position', new THREE.BufferAttribute(lVertices, 3));
-
-            var lOffsets = new Float32Array(nLines * 3);
-            var lRotations = new Float32Array(nLines); // radians
-            var lRotationStep = 2 * Math.PI / nLines;
-            
-            // ccw along xz surface
-            for (var i = 0; i < nLines; i++) {
-                lRotations[i] = lRotationStep * i;
-            }
-
-            var lWaveParams = new Float32Array(nLines).fill(1);
-            lWaveParams[0] = lWaveParams[nLines - 1] = 0;
-
-            var lig = new THREE.InstancedBufferGeometry();
-            lig.copy(lGeometry);
-            lig.addAttribute("offset", new THREE.InstancedBufferAttribute(lOffsets, 3)); // use in vs required
-            lig.addAttribute("rotation", new THREE.InstancedBufferAttribute(lRotations, 1));
-            lig.addAttribute("waveParam", new THREE.InstancedBufferAttribute(lWaveParams, 1));
-
-            var vs2 = document.getElementById("vertexShader2").textContent;
-            var lMaterial = new THREE.ShaderMaterial({
-                uniforms: {
-                    waveParam: { value: waveParam }
-                },
-                vertexShader: vs2,
-                fragmentShader: fs
-            });
-            var lMesh = new THREE.Line(lig, lMaterial); 
-            scene.add(lMesh);
-
-
 
             renderer = new THREE.WebGLRenderer();
             renderer.setPixelRatio(window.devicePixelRatio);
