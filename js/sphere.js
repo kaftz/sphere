@@ -8,7 +8,7 @@ function Sphere(options) {
     this.radius = 10;
     this.waveParam = 0;
     this.cSegments = 128;
-    this.nCircles = this.options.nCircles || 5;
+    this.nCircles = this.options.nCircles || 3;
     this.nLines = this.nCircles * 2;
 
     // attributes
@@ -18,7 +18,7 @@ function Sphere(options) {
     this.cScales = new Float32Array(this.MAX_CIRCLES);
 
     // previously allocated based on nLines
-    this.lVertices = new Float32Array((this.nCircles + 2) * 3); // update
+    this.lVertices = new Float32Array((this.MAX_CIRCLES + 2) * 3);
     this.lOffsets = new Float32Array(this.MAX_LINES * 3); // static
     this.lRotations = new Float32Array(this.MAX_LINES); // radians
     this.lWaveParams = new Float32Array(this.MAX_LINES);
@@ -104,7 +104,7 @@ Sphere.prototype.updateCircleScales = function() {
     this.cScales.fill(0, this.nCircles);
 };
 
-// may reuse scale calcs here?
+// may reuse circle scale calcs here?
 Sphere.prototype.updateLineVertices = function() {
     this.lVertices[0] = 0;
     this.lVertices[1] = this.radius;
@@ -116,6 +116,13 @@ Sphere.prototype.updateLineVertices = function() {
         this.lVertices[(i + 1) * 3] = this.cScales[i] * this.radius; 
         this.lVertices[(i + 1) * 3 + 1] = this.cOffsets[i * 3 + 1];
         this.lVertices[(i + 1) * 3 + 2] = 0;
+    }
+
+    // clearing to bottom vertex
+    for (var j = this.nCircles + 2; j < this.MAX_CIRCLES + 2; j++) {
+        this.lVertices[j * 3] = 0;
+        this.lVertices[j * 3 + 1] = -this.radius;
+        this.lVertices[j * 3 + 2] = 0;
     }
 };
 
@@ -143,8 +150,10 @@ Sphere.prototype.updateCIGAttrs = function() {
     this.cig.attributes.offset.needsUpdate = true;
     this.cig.attributes.scale.needsUpdate = true;
 
+    this.updateLineVertices();
     this.updateLineRotations();
     this.updateLineWaveParams();
+    this.lig.attributes.position.needsUpdate = true;
     this.lig.attributes.rotation.needsUpdate = true;
     this.lig.attributes.waveParam.needsUpdate = true;
 };
