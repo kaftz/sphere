@@ -43,11 +43,14 @@
         uniform float waveParam;
         attribute vec3 offset;
         attribute float rotation;
+        attribute float alphaParam;
+        varying float alphaParamVal;
         float ifgt(float x, float y);
 
         // add wave adjustment before rotating
         // radius is position.x
         void main() {
+            alphaParamVal = alphaParam;
             vec3 ap = position;
 
             // temporary scale adjustment
@@ -62,16 +65,25 @@
             gl_Position = projectionMatrix * modelViewMatrix * vec4(ap, 1.0);
         }
 
-        // comparing floats?
         float ifgt(float x, float y) {
-            return max(sign(x - y), 0.0);
+            return max(sign(x - y), 0.0); // comparing floats?
         }
     </script>
 
     <script type="x-shader/x-fragment" id="fragmentShader">
-        uniform vec3 cColor;
+        uniform vec3 sColor;
+        uniform float alpha;
         void main() {
-            gl_FragColor = vec4(cColor, 0.4);
+            gl_FragColor = vec4(sColor, alpha);
+        }
+    </script>
+
+    <script type="x-shader/x-fragment" id="fragmentShader2">
+        uniform vec3 sColor;
+        uniform float alpha;
+        varying float alphaParamVal;
+        void main() {
+            gl_FragColor = vec4(sColor, alpha * alphaParamVal);
         }
     </script>
 
@@ -108,14 +120,15 @@
             scene.add(sphere.cMesh);
             scene.add(sphere.cMesh2);
             scene.add(sphere.lMesh);
+            scene.add(sphere.lMesh2);
 
             // init gui
             gui = new dat.GUI();
-            gui.add(sphere, "nCircles", 3, 51).step(1).onChange(function() {
+            gui.add(sphere, "nCircles", 3, 91).step(1).onChange(function() {
                 sphere.updateCIGAttrs();
             });
 
-            renderer = new THREE.WebGLRenderer();
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(width, height);
             document.body.appendChild(renderer.domElement);

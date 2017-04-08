@@ -2,14 +2,19 @@ function Sphere(options) {
     this.options = options || {};
 
     // constants
-    this.MAX_CIRCLES = 51;
+    this.MAX_CIRCLES = 91;
     this.MAX_LINES = this.MAX_CIRCLES * 2;
 
     this.radius = 10;
     this.waveParam = 0;
+    this.alpha = 0.33;
     this.cSegments = 128;
     this.nCircles = this.options.nCircles || 3;
     this.nLines = this.nCircles * 2;
+
+    // colors (uniforms)
+    this.c1 = new THREE.Vector3(1, 0, 0);
+    this.c2 = new THREE.Vector3(0, 0, 1);
 
     // attributes
     // previously allocated attrs based on nCircles
@@ -21,7 +26,7 @@ function Sphere(options) {
     this.lVertices = new Float32Array((this.MAX_CIRCLES + 2) * 3);
     this.lOffsets = new Float32Array(this.MAX_LINES * 3); // static
     this.lRotations = new Float32Array(this.MAX_LINES); // radians
-    this.lWaveParams = new Float32Array(this.MAX_LINES);
+    this.lAlphas = new Float32Array(this.MAX_LINES);
 
     // set cig attributes
     this.updateCircleVertices();
@@ -37,39 +42,49 @@ function Sphere(options) {
     var fs = document.getElementById("fragmentShader").textContent;
     var cMaterial = new THREE.ShaderMaterial({
         uniforms: {
-            cColor: { value: new THREE.Vector3(1.0, 0.0, 0.0) }
+            sColor: { value: this.c1 },
+            alpha: { value: this.alpha }
         },
         vertexShader: vs,
         fragmentShader: fs,
         transparent: true,
         blending: "MultiplyBlending"
     });
-    this.cMesh = new THREE.Line(this.cig, cMaterial);
-
     var cMaterial2 = cMaterial.clone();
-    cMaterial2.uniforms.cColor = { value: new THREE.Vector3(0.0, 0.0, 1.0) };
+    cMaterial2.uniforms.sColor = { value: this.c2 };
+
+    this.cMesh = new THREE.Line(this.cig, cMaterial);
     this.cMesh2 = new THREE.Line(this.cig, cMaterial2);
 
     // set lig attributes
     this.updateLineVertices();
     this.updateLineRotations();
-    this.updateLineWaveParams();
+    this.updateLineAlphas();
 
     this.lig = new THREE.InstancedBufferGeometry();
-    this.lig.addAttribute('position', new THREE.BufferAttribute(this.lVertices, 3));
+    this.lig.addAttribute("position", new THREE.BufferAttribute(this.lVertices, 3));
     this.lig.addAttribute("offset", new THREE.InstancedBufferAttribute(this.lOffsets, 3)); // use in vs required
     this.lig.addAttribute("rotation", new THREE.InstancedBufferAttribute(this.lRotations, 1));
-    this.lig.addAttribute("waveParam", new THREE.InstancedBufferAttribute(this.lWaveParams, 1));
+    this.lig.addAttribute("alphaParam", new THREE.InstancedBufferAttribute(this.lAlphas, 1));
 
     var vs2 = document.getElementById("vertexShader2").textContent;
+    var fs2 = document.getElementById("fragmentShader2").textContent;
     var lMaterial = new THREE.ShaderMaterial({
         uniforms: {
-            waveParam: { value: this.waveParam }
+            sColor: { value: this.c1 },
+            waveParam: { value: this.waveParam },
+            alpha: { value: this.alpha }
         },
         vertexShader: vs2,
-        fragmentShader: fs
+        fragmentShader: fs2,
+        transparent: true,
+        blending: "MultiplyBlending"
     });
+    var lMaterial2 = lMaterial.clone();
+    lMaterial2.uniforms.sColor = { value: this.c2 };
+
     this.lMesh = new THREE.Line(this.lig, lMaterial); 
+    this.lMesh2 = new THREE.Line(this.lig, lMaterial2); 
 }
 
 // move radius adjustment to vs?
@@ -135,10 +150,10 @@ Sphere.prototype.updateLineRotations = function() {
     this.lRotations.fill(0, this.nLines);
 };
 
-// prevent certain line vertices from being repositioned (top, bottom)
-Sphere.prototype.updateLineWaveParams = function() {
-    this.lWaveParams.fill(1, 1);
-    this.lWaveParams[this.nLines - 1] = 0;
+// hide extra line vertices (use alpha or try scaling down)
+Sphere.prototype.updateLineAlphas = function() {
+    this.lAlphas.fill(1, 0, this.nLines);
+    this.lAlphas.fill(0, this.nLines, this.MAX_LINES);
 };
 
 // called on nCircles change
@@ -152,9 +167,8 @@ Sphere.prototype.updateCIGAttrs = function() {
 
     this.updateLineVertices();
     this.updateLineRotations();
-    this.updateLineWaveParams();
+    this.updateLineAlphas();
     this.lig.attributes.position.needsUpdate = true;
     this.lig.attributes.rotation.needsUpdate = true;
-    this.lig.attributes.waveParam.needsUpdate = true;
+    this.lig.attributes.alphaParam.needsUpdate = true;
 };
-
