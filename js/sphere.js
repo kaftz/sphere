@@ -6,15 +6,16 @@ function Sphere(options) {
     this.MAX_LINES = this.MAX_CIRCLES * 2;
 
     this.radius = 10;
-    this.waveParam = 0;
-    this.alpha = 0.33;
     this.cSegments = 128;
     this.nCircles = this.options.nCircles || 3;
     this.nLines = this.nCircles * 2;
 
-    // colors (uniforms)
-    this.c1 = new THREE.Vector3(1, 0, 0);
-    this.c2 = new THREE.Vector3(0, 0, 1);
+    // uniforms
+    this.waveParam = 8;
+    this.alpha = { value: 0.33 };
+    this.time = { value: 0 };
+    this.c1 = { value: new THREE.Vector3(1, 0, 0) };
+    this.c2 = { value: new THREE.Vector3(0, 0, 1) };
 
     // attributes
     // previously allocated attrs based on nCircles
@@ -42,8 +43,8 @@ function Sphere(options) {
     var fs = document.getElementById("fragmentShader").textContent;
     var cMaterial = new THREE.ShaderMaterial({
         uniforms: {
-            sColor: { value: this.c1 },
-            alpha: { value: this.alpha }
+            sColor: this.c1,
+            alpha: this.alpha
         },
         vertexShader: vs,
         fragmentShader: fs,
@@ -51,7 +52,7 @@ function Sphere(options) {
         blending: "MultiplyBlending"
     });
     var cMaterial2 = cMaterial.clone();
-    cMaterial2.uniforms.sColor = { value: this.c2 };
+    cMaterial2.uniforms.sColor = this.c2;
 
     this.cMesh = new THREE.Line(this.cig, cMaterial);
     this.cMesh2 = new THREE.Line(this.cig, cMaterial2);
@@ -71,9 +72,10 @@ function Sphere(options) {
     var fs2 = document.getElementById("fragmentShader2").textContent;
     var lMaterial = new THREE.ShaderMaterial({
         uniforms: {
-            sColor: { value: this.c1 },
+            time: this.time,
+            sColor: this.c1,
             waveParam: { value: this.waveParam },
-            alpha: { value: this.alpha }
+            alpha: this.alpha
         },
         vertexShader: vs2,
         fragmentShader: fs2,
@@ -81,7 +83,7 @@ function Sphere(options) {
         blending: "MultiplyBlending"
     });
     var lMaterial2 = lMaterial.clone();
-    lMaterial2.uniforms.sColor = { value: this.c2 };
+    lMaterial2.uniforms.sColor = this.c2;
 
     this.lMesh = new THREE.Line(this.lig, lMaterial); 
     this.lMesh2 = new THREE.Line(this.lig, lMaterial2); 
@@ -157,11 +159,14 @@ Sphere.prototype.updateLineAlphas = function() {
 };
 
 // called on nCircles change
+// review this
 Sphere.prototype.updateCIGAttrs = function() {
     this.nLines = this.nCircles * 2;
 
+    this.updateCircleVertices();
     this.updateCircleOffsets();
     this.updateCircleScales();
+    this.cig.attributes.position.needsUpdate = true;
     this.cig.attributes.offset.needsUpdate = true;
     this.cig.attributes.scale.needsUpdate = true;
 
@@ -171,4 +176,11 @@ Sphere.prototype.updateCIGAttrs = function() {
     this.lig.attributes.position.needsUpdate = true;
     this.lig.attributes.rotation.needsUpdate = true;
     this.lig.attributes.alphaParam.needsUpdate = true;
+};
+
+Sphere.prototype.timedUpdate = function(ms) {
+    console.log("starting timed update");
+    //if (!this.lastUpdateMS) this.lastUpdateMS = Date.now();
+    this.time.value = Date.now() / 1000;
+    this.updateCIGAttrs();
 };
