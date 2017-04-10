@@ -31,16 +31,26 @@
     <script src="js/sphere.js"></script>
 
     <script type="x-shader/x-vertex" id="vertexShader">
+        #define M_PI 3.141592653589793
+        uniform float time;
         attribute vec3 offset;
         attribute float scale;
         void main() {
-            vec3 op = position * scale + offset;
+            // offset modifier: wavelength, time modifier: wave speed
+            // 0 to 2 * coeff.
+            float waveComponent = (1.0 + sin(2.0 * M_PI * offset.y / 4.0 + 2.0 * M_PI * time)) * 0.1;
+
+            // x wavelengths * theta
+            // this is semi-static
+            float theta = atan(position.z, position.x);
+            float waveComponent2 = (1.0 + sin(10.0 * theta + 2.0 * M_PI * time)) * 0.1;
+
+            vec3 op = position * scale * (waveComponent + waveComponent2 + 1.0) + offset;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(op, 1.0);
         }
     </script>
 
     <script type="x-shader/x-vertex" id="vertexShader2">
-        uniform float time; // unused atm
         uniform float waveParam;
         attribute vec3 offset;
         attribute float rotation;
@@ -119,16 +129,18 @@
 
             sphere = new Sphere();
             scene.add(sphere.cMesh);
+            /*
             scene.add(sphere.cMesh2);
             scene.add(sphere.lMesh);
             scene.add(sphere.lMesh2);
+            */
 
             // init gui
             gui = new dat.GUI();
             gui.add(sphere, "nCircles", 3, 91).step(1).onChange(function() {
                 sphere.updateCIGAttrs();
             });
-            gui.add(sphere, "timedUpdate");
+            //gui.add(sphere, "timedUpdate");
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setPixelRatio(window.devicePixelRatio);

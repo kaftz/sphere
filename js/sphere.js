@@ -4,18 +4,17 @@ function Sphere(options) {
     // constants
     this.MAX_CIRCLES = 91;
     this.MAX_LINES = this.MAX_CIRCLES * 2;
-
     this.radius = 10;
     this.cSegments = 128;
-    this.nCircles = this.options.nCircles || 3;
+    this.nCircles = this.options.nCircles || 71;
     this.nLines = this.nCircles * 2;
 
     // uniforms
     this.waveParam = 8;
     this.alpha = { value: 0.33 };
-    this.time = { value: 0 };
-    this.c1 = { value: new THREE.Vector3(1, 0, 0) };
-    this.c2 = { value: new THREE.Vector3(0, 0, 1) };
+    this.c1 = { value: new THREE.Vector3(1, 0, 1) };
+    this.c2 = { value: new THREE.Vector3(0, 1, 1) };
+    this.c3 = { value: new THREE.Vector3(1, 1, 0) };
 
     // attributes
     // previously allocated attrs based on nCircles
@@ -43,6 +42,7 @@ function Sphere(options) {
     var fs = document.getElementById("fragmentShader").textContent;
     var cMaterial = new THREE.ShaderMaterial({
         uniforms: {
+            time: { value: 0 },
             sColor: this.c1,
             alpha: this.alpha
         },
@@ -72,7 +72,6 @@ function Sphere(options) {
     var fs2 = document.getElementById("fragmentShader2").textContent;
     var lMaterial = new THREE.ShaderMaterial({
         uniforms: {
-            time: this.time,
             sColor: this.c1,
             waveParam: { value: this.waveParam },
             alpha: this.alpha
@@ -94,15 +93,15 @@ function Sphere(options) {
 Sphere.prototype.updateCircleVertices = function() {
     var thetaStep = 2 * Math.PI / this.cSegments;
     for (var i = 0; i <= this.cSegments; i++) {
-        var adjustedRadius = this.radius + Math.sin(thetaStep * i * this.waveParam);
-        this.cVertices[i * 3] = adjustedRadius * Math.cos(thetaStep * i);
+        this.cVertices[i * 3] = this.radius * Math.cos(thetaStep * i);
         this.cVertices[i * 3 + 1] = 0;
-        this.cVertices[i * 3 + 2] = adjustedRadius * Math.sin(thetaStep * i);
+        this.cVertices[i * 3 + 2] = this.radius * Math.sin(thetaStep * i);
     }
 };
 
 // higher attr indices should be cleared when nCircles is scaled down
 // probably can't optimize this much without moving to vs
+// does this have to be a vec3?
 Sphere.prototype.updateCircleOffsets = function() {
     var cOffsetStep = 2 * this.radius / (this.nCircles + 1);
     for (var i = 0; i < this.nCircles; i++) {
@@ -119,6 +118,9 @@ Sphere.prototype.updateCircleScales = function() {
         this.cScales[i] = Math.cos(theta);
     }
     this.cScales.fill(0, this.nCircles);
+};
+
+Sphere.prototype.updateCircleSW = function() {
 };
 
 // may reuse circle scale calcs here?
@@ -179,8 +181,7 @@ Sphere.prototype.updateCIGAttrs = function() {
 };
 
 Sphere.prototype.timedUpdate = function(ms) {
-    console.log("starting timed update");
     //if (!this.lastUpdateMS) this.lastUpdateMS = Date.now();
-    this.time.value = Date.now() / 1000;
+    this.cMesh.material.uniforms.time.value = (Date.now() / 1000) % 2; // period: 2s
     this.updateCIGAttrs();
 };
