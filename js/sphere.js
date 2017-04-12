@@ -1,20 +1,116 @@
+function Scheduler() {
+    this.tasks = [];
+}
+
+Scheduler.prototype.addTask = function(task) {
+    this.tasks.push(task);
+};
+
+Scheduler.prototype.runTasks = function(now) {
+    var self = this;
+    if (now === undefined) now = Date.now();
+
+    this.tasks.forEach(function(task) {
+        var ready = task.condition instanceof Function ? task.condition(self, now) : task.condition < now;
+        if (ready) {
+            if (task.runCallback) task.runCallback(self, now);
+            task.run = true;
+        }
+    });
+
+    this.tasks = this.tasks.filter(function(task) {
+        return !task.run;
+    });
+};
+
+
+// easing
+function Timer() {
+    this.transitions = {};
+}
+
+// required: duration?, startVal, endVal
+Timer.prototype.addTransition = function(t) {
+    if (!t.key) throw new Error("key is required");
+    //if (this.transitions[t.key]) throw new Error("key is in use"); // just override?
+
+    var now = Date.now();
+    t.start = now; // start and end mutually exclusive with rate
+    if (t.duration) t.end = t.duration + now;
+    if (!t.type) t.type = "linear";
+    this.transitions[t.key] = t;
+};
+
+// check for completion?
+Timer.prototype.get = function(key, now) {
+    var t = this.transitions[key];
+    if (!t) return null;
+    if (now === undefined) now = Date.now();
+
+    switch (t.type) {
+        case "linear": return this.linear(t, now);
+        case "iosine": return this.iosine(t, now);
+        case "constant": return this.constant(t, now);
+        default: throw new Error("transition type was not matched");
+    }
+};
+
+Timer.prototype.linear = function(t, now) {
+    var res = t.end < now ? 1 : (now - t.start) / t.duration;
+    if (t.startVal !== undefined && t.endVal !== undefined) res = t.startVal + res * (t.endVal - t.startVal);
+    return res;
+};
+
+Timer.prototype.iosine = function(t, now) {
+    var d = now - t.start;
+    //var res = d > t.duration ? 1 : d  < t.duration / 2 ? 4 * d * d * d : (d - 1) * (2 * d - 2) * (2 * d - 2) + 1;
+    var res = d > t.duration ? 1 : -0.5 * (Math.cos(Math.PI * d/t.duration) - 1);
+    if (t.startVal !== undefined && t.endVal !== undefined) res = t.startVal + res * (t.endVal - t.startVal);
+    return res;
+};
+
+// constant rate
+Timer.prototype.constant = function(t, now) {
+    return (now - t.start) * t.rate;
+};
+
+
 function Sphere(options) {
     this.options = options || {};
+    
+    // temp
+    this.scheduler = new Scheduler();
+    this.timer = new Timer();
 
     // constants
     this.MAX_CIRCLES = 91;
     this.MAX_LINES = this.MAX_CIRCLES * 2;
+
     this.radius = 10;
     this.cSegments = 128;
-    this.nCircles = this.options.nCircles || 71;
+    this.nCircles = this.options.nCircles || 15;
     this.nLines = this.nCircles * 2;
 
+    // wave params (calc time interval)
+    this.waveVN = 10;
+    this.waveHN = 10;
+
     // uniforms
-    this.waveParam = 8;
-    this.alpha = { value: 0.33 };
+    this.alpha = { value: 0.3 };
     this.c1 = { value: new THREE.Vector3(1, 0, 1) };
     this.c2 = { value: new THREE.Vector3(0, 1, 1) };
     this.c3 = { value: new THREE.Vector3(1, 1, 0) };
+    this.gRS = { value: 0 }; // radians
+    this.gRS2 = { value: 0 };
+    this.gRS3 = { value: 0 }; 
+
+    // wave uniforms
+    this.waveVA = { value: 0.00 };
+    this.waveVF = { value: 2 * Math.PI / (2 * this.radius / this.waveVN) };
+    this.waveVS = { value: 2 * Math.PI / 2 };
+    this.waveHA = { value: 0.00 };
+    this.waveHF = { value: this.waveHN };
+    this.waveHS = { value: 2 * Math.PI / 2 };
 
     // attributes
     // previously allocated attrs based on nCircles
@@ -43,16 +139,25 @@ function Sphere(options) {
     var cMaterial = new THREE.ShaderMaterial({
         uniforms: {
             time: { value: 0 },
+            waveVA: this.waveVA,
+            waveVF: this.waveVF,
+            waveVS: this.waveVS,
+            waveHA: this.waveHA,
+            waveHF: this.waveHF,
+            waveHS: this.waveHS,
+            alpha: this.alpha,
             sColor: this.c1,
-            alpha: this.alpha
+            gRotation: { value: 0 }
         },
         vertexShader: vs,
         fragmentShader: fs,
         transparent: true,
         blending: "MultiplyBlending"
     });
+
     var cMaterial2 = cMaterial.clone();
     cMaterial2.uniforms.sColor = this.c2;
+    cMaterial2.uniforms.gRS = this.gRS2;
 
     this.cMesh = new THREE.Line(this.cig, cMaterial);
     this.cMesh2 = new THREE.Line(this.cig, cMaterial2);
@@ -72,20 +177,34 @@ function Sphere(options) {
     var fs2 = document.getElementById("fragmentShader2").textContent;
     var lMaterial = new THREE.ShaderMaterial({
         uniforms: {
+            time: { value: 0 },
+            waveVA: this.waveVA,
+            waveVF: this.waveVF,
+            waveVS: this.waveVS,
+            waveHA: this.waveHA,
+            waveHF: this.waveHF,
+            waveHS: this.waveHS,
+            alpha: this.alpha,
             sColor: this.c1,
-            waveParam: { value: this.waveParam },
-            alpha: this.alpha
+            gRS: this.gRS
         },
         vertexShader: vs2,
         fragmentShader: fs2,
         transparent: true,
-        blending: "MultiplyBlending"
+        blending: THREE["MultiplyBlending"]
     });
+
     var lMaterial2 = lMaterial.clone();
     lMaterial2.uniforms.sColor = this.c2;
+    lMaterial2.uniforms.gRS = this.gRS2;
+
+    var lMaterial3 = lMaterial.clone();
+    lMaterial3.uniforms.sColor = this.c3;
+    lMaterial3.uniforms.gRS = this.gRS3;
 
     this.lMesh = new THREE.Line(this.lig, lMaterial); 
     this.lMesh2 = new THREE.Line(this.lig, lMaterial2); 
+    this.lMesh3 = new THREE.Line(this.lig, lMaterial3); 
 }
 
 // move radius adjustment to vs?
@@ -182,6 +301,72 @@ Sphere.prototype.updateCIGAttrs = function() {
 
 Sphere.prototype.timedUpdate = function(ms) {
     //if (!this.lastUpdateMS) this.lastUpdateMS = Date.now();
-    this.cMesh.material.uniforms.time.value = (Date.now() / 1000) % 2; // period: 2s
+    //this.cMesh.material.uniforms.time.value = (Date.now() / 1000) % 10; // period: 2s
+    //this.cMesh2.material.uniforms.time.value = (Date.now() / 1000) % 10;
+
+    /*
+    this.lMesh.material.uniforms.time.value = (Date.now() / 1000) % 20;
+    this.lMesh2.material.uniforms.time.value = (Date.now() / 1000) % 19;
     this.updateCIGAttrs();
+    */
+
+    this.scheduler.runTasks();
+    this.lMesh.material.uniforms.gRS.value = (this.timer.get("cgRS") + this.timer.get("gRS")) % (2 * Math.PI);
+    this.lMesh2.material.uniforms.gRS.value = (this.timer.get("cgRS") + this.timer.get("gRS2")) % (2 * Math.PI);
+    this.lMesh3.material.uniforms.gRS.value = (this.timer.get("cgRS") + this.timer.get("gRS3")) % (2 * Math.PI);
 };
+
+Sphere.prototype.startAnimation = function() {
+    var self = this;
+
+    // constant stuff
+    self.timer.addTransition({
+        key: "cgRS",
+        rate: 2 * Math.PI / (1000 * 20), // radians per ms
+        type: "constant"
+    });
+
+    var mainCB = function(scheduler, now) {
+        scheduler.addTask({ 
+            condition: now + 10000,
+            runCallback: mainCB
+        });
+
+        var gRS = self.timer.get("gRS", now);
+        if (gRS === null) gRS = 0;
+        self.timer.addTransition({
+            key: "gRS",
+            duration: 5000,
+            startVal: gRS,
+            endVal: gRS + 2 * Math.PI,
+            type: "iosine"
+        });
+
+        var gRS2 = self.timer.get("gRS2", now);
+        if (gRS2 === null) gRS2 = 0;
+        self.timer.addTransition({
+            key: "gRS2",
+            duration: 5050,
+            startVal: gRS2,
+            endVal: gRS2 + 2 * Math.PI,
+            type: "iosine"
+        });
+
+        var gRS3 = self.timer.get("gRS3", now);
+        if (gRS3 === null) gRS3 = 0;
+        self.timer.addTransition({
+            key: "gRS3",
+            duration: 5120,
+            startVal: gRS3,
+            endVal: gRS3 + 2 * Math.PI,
+            type: "iosine"
+        });
+    };
+
+    var now = Date.now();
+    this.scheduler.addTask({
+        condition: now + 1000,
+        runCallback: mainCB
+    });
+};
+

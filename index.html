@@ -31,19 +31,22 @@
     <script src="js/sphere.js"></script>
 
     <script type="x-shader/x-vertex" id="vertexShader">
-        #define M_PI 3.141592653589793
         uniform float time;
+        uniform float waveVA;
+        uniform float waveVF;
+        uniform float waveVS;
+        uniform float waveHA;
+        uniform float waveHF;
+        uniform float waveHS;
+        uniform float waveHP;
+
         attribute vec3 offset;
         attribute float scale;
         void main() {
-            // offset modifier: wavelength, time modifier: wave speed
             // 0 to 2 * coeff.
-            float waveComponent = (1.0 + sin(2.0 * M_PI * offset.y / 4.0 + 2.0 * M_PI * time)) * 0.1;
-
-            // x wavelengths * theta
-            // this is semi-static
-            float theta = atan(position.z, position.x);
-            float waveComponent2 = (1.0 + sin(10.0 * theta + 2.0 * M_PI * time)) * 0.1;
+            float waveComponent = (1.0 + sin(waveVF * offset.y + waveVS * time)) * waveVA;
+            float theta = atan(position.z, position.x); // this is semi-static
+            float waveComponent2 = (1.0 + sin(waveHF * theta + waveHS * time)) * waveHA;
 
             vec3 op = position * scale * (waveComponent + waveComponent2 + 1.0) + offset;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(op, 1.0);
@@ -51,24 +54,32 @@
     </script>
 
     <script type="x-shader/x-vertex" id="vertexShader2">
-        uniform float waveParam;
+        uniform float time;
+        uniform float waveVA;
+        uniform float waveVF;
+        uniform float waveVS;
+        uniform float waveHA;
+        uniform float waveHF;
+        uniform float waveHS;
+        uniform float gRS;
+
         attribute vec3 offset;
         attribute float rotation;
         attribute float alphaParam;
         varying float alphaParamVal;
         float ifgt(float x, float y);
 
-        // add wave adjustment before rotating
-        // radius is position.x
         void main() {
             alphaParamVal = alphaParam;
             vec3 ap = position;
+            float ar = rotation + gRS;
 
-            // temporary scale adjustment
-            ap.x = position.x - sin(rotation * waveParam) * ifgt(position.x, 0.0) * position.x / 10.0;
+            float waveComponent = (1.0 + sin(waveVF * position.y + waveVS * time)) * waveVA;
+            float waveComponent2 = (1.0 + sin(waveHF * -rotation + waveHS * time)) * waveHA;
+            ap.x = position.x * (waveComponent + waveComponent2 + 1.0);
 
-            float sinTheta = sin(rotation);
-            float cosTheta = cos(rotation);
+            float sinTheta = sin(ar);
+            float cosTheta = cos(ar);
             float rx = cosTheta * ap.x + sinTheta * position.z;
             float rz = -sinTheta * ap.x + cosTheta * position.z;
             ap.x = rx;
@@ -120,7 +131,7 @@
             var width = window.innerWidth;
             var height = window.innerHeight;
             camera = new THREE.PerspectiveCamera(40, width/height, 1, 1000);
-            camera.position.y = 5;
+            camera.position.y = 40;
             camera.position.z = 40;
             camera.lookAt(new THREE.Vector3(0, 0, 0));
 
@@ -128,12 +139,11 @@
             scene.background = new THREE.Color(0xffffff);
 
             sphere = new Sphere();
-            scene.add(sphere.cMesh);
-            /*
-            scene.add(sphere.cMesh2);
+            //scene.add(sphere.cMesh);
+            //scene.add(sphere.cMesh2);
             scene.add(sphere.lMesh);
             scene.add(sphere.lMesh2);
-            */
+            scene.add(sphere.lMesh3);
 
             // init gui
             gui = new dat.GUI();
@@ -153,6 +163,8 @@
             //stats = new Stats();
             //stats.domElement.setAttribute("id", "stats");
             //document.body.appendChild(stats.domElement);
+
+            sphere.startAnimation();
 
             // add event handlers
             window.addEventListener("resize", onResize, false);
