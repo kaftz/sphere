@@ -250,6 +250,7 @@ Sphere.prototype.timedUpdate = function(ms) {
     if (circles != this.nCircles) this.updateIGAttrs(circles);
 };
 
+// de-syncing
 Sphere.prototype.startAnimation = function() {
     var self = this;
 
