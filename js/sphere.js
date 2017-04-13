@@ -1,116 +1,41 @@
-function Scheduler() {
-    this.tasks = [];
-}
-
-Scheduler.prototype.addTask = function(task) {
-    this.tasks.push(task);
-};
-
-Scheduler.prototype.runTasks = function(now) {
-    var self = this;
-    if (now === undefined) now = Date.now();
-
-    this.tasks.forEach(function(task) {
-        var ready = task.condition instanceof Function ? task.condition(self, now) : task.condition < now;
-        if (ready) {
-            if (task.runCallback) task.runCallback(self, now);
-            task.run = true;
-        }
-    });
-
-    this.tasks = this.tasks.filter(function(task) {
-        return !task.run;
-    });
-};
-
-
-// easing
-function Timer() {
-    this.transitions = {};
-}
-
-// required: duration?, startVal, endVal
-Timer.prototype.addTransition = function(t) {
-    if (!t.key) throw new Error("key is required");
-    //if (this.transitions[t.key]) throw new Error("key is in use"); // just override?
-
-    var now = Date.now();
-    t.start = now; // start and end mutually exclusive with rate
-    if (t.duration) t.end = t.duration + now;
-    if (!t.type) t.type = "linear";
-    this.transitions[t.key] = t;
-};
-
-// check for completion?
-Timer.prototype.get = function(key, now) {
-    var t = this.transitions[key];
-    if (!t) return null;
-    if (now === undefined) now = Date.now();
-
-    switch (t.type) {
-        case "linear": return this.linear(t, now);
-        case "iosine": return this.iosine(t, now);
-        case "constant": return this.constant(t, now);
-        default: throw new Error("transition type was not matched");
-    }
-};
-
-Timer.prototype.linear = function(t, now) {
-    var res = t.end < now ? 1 : (now - t.start) / t.duration;
-    if (t.startVal !== undefined && t.endVal !== undefined) res = t.startVal + res * (t.endVal - t.startVal);
-    return res;
-};
-
-Timer.prototype.iosine = function(t, now) {
-    var d = now - t.start;
-    //var res = d > t.duration ? 1 : d  < t.duration / 2 ? 4 * d * d * d : (d - 1) * (2 * d - 2) * (2 * d - 2) + 1;
-    var res = d > t.duration ? 1 : -0.5 * (Math.cos(Math.PI * d/t.duration) - 1);
-    if (t.startVal !== undefined && t.endVal !== undefined) res = t.startVal + res * (t.endVal - t.startVal);
-    return res;
-};
-
-// constant rate
-Timer.prototype.constant = function(t, now) {
-    return (now - t.start) * t.rate;
-};
-
-
 function Sphere(options) {
     this.options = options || {};
     
-    // temp
-    this.scheduler = new Scheduler();
-    this.timer = new Timer();
-
     // constants
     this.MAX_CIRCLES = 91;
     this.MAX_LINES = this.MAX_CIRCLES * 2;
 
+    // timing
+    this.scheduler = new Scheduler();
+    this.timer = new Timer();
+
     this.radius = 10;
     this.cSegments = 128;
-    this.nCircles = this.options.nCircles || 15;
+    this.nCircles = this.options.nCircles || 25;
     this.nLines = this.nCircles * 2;
 
     // wave params (calc time interval)
     this.waveVN = 10;
-    this.waveHN = 10;
+    this.waveHN = 20;
 
     // uniforms
-    this.alpha = { value: 0.3 };
-    this.c1 = { value: new THREE.Vector3(1, 0, 1) };
-    this.c2 = { value: new THREE.Vector3(0, 1, 1) };
-    this.c3 = { value: new THREE.Vector3(1, 1, 0) };
+    this.alpha = { value: 1 }; // multiply blending w/ alpha?
+    this.c1 = { value: new THREE.Vector3(0, 0, 0) };
+    this.c2 = { value: new THREE.Vector3(0.4, 0.4, 0.8) };
+    this.c3 = { value: new THREE.Vector3(0.8, 0.8, 0.8) };
     this.gRS = { value: 0 }; // radians
     this.gRS2 = { value: 0 };
     this.gRS3 = { value: 0 }; 
 
     // wave uniforms
-    this.waveVA = { value: 0.00 };
+    this.waveVA = { value: 0 };
+    this.waveVA2 = { value: 0 };
     this.waveVF = { value: 2 * Math.PI / (2 * this.radius / this.waveVN) };
-    this.waveVS = { value: 2 * Math.PI / 2 };
-    this.waveHA = { value: 0.00 };
+    this.waveVS = { value: 4 * 2 * Math.PI }; // repeats every 2s
+    this.waveHA = { value: 0 };
+    this.waveHA2 = { value: 0 };
     this.waveHF = { value: this.waveHN };
-    this.waveHS = { value: 2 * Math.PI / 2 };
+    this.waveHS = { value: 8 * 2 * Math.PI / 2 };
 
     // attributes
     // previously allocated attrs based on nCircles
@@ -122,7 +47,7 @@ function Sphere(options) {
     this.lVertices = new Float32Array((this.MAX_CIRCLES + 2) * 3);
     this.lOffsets = new Float32Array(this.MAX_LINES * 3); // static
     this.lRotations = new Float32Array(this.MAX_LINES); // radians
-    this.lAlphas = new Float32Array(this.MAX_LINES);
+    this.lDisplayParams = new Float32Array(this.MAX_LINES);
 
     // set cig attributes
     this.updateCircleVertices();
@@ -147,12 +72,12 @@ function Sphere(options) {
             waveHS: this.waveHS,
             alpha: this.alpha,
             sColor: this.c1,
-            gRotation: { value: 0 }
+            gRS: this.gRS
         },
         vertexShader: vs,
         fragmentShader: fs,
         transparent: true,
-        blending: "MultiplyBlending"
+        blending: THREE["MultiplyBlending"]
     });
 
     var cMaterial2 = cMaterial.clone();
@@ -165,13 +90,13 @@ function Sphere(options) {
     // set lig attributes
     this.updateLineVertices();
     this.updateLineRotations();
-    this.updateLineAlphas();
+    this.updateLineDisplayParams();
 
     this.lig = new THREE.InstancedBufferGeometry();
     this.lig.addAttribute("position", new THREE.BufferAttribute(this.lVertices, 3));
     this.lig.addAttribute("offset", new THREE.InstancedBufferAttribute(this.lOffsets, 3)); // use in vs required
     this.lig.addAttribute("rotation", new THREE.InstancedBufferAttribute(this.lRotations, 1));
-    this.lig.addAttribute("alphaParam", new THREE.InstancedBufferAttribute(this.lAlphas, 1));
+    this.lig.addAttribute("displayParam", new THREE.InstancedBufferAttribute(this.lDisplayParams, 1));
 
     var vs2 = document.getElementById("vertexShader2").textContent;
     var fs2 = document.getElementById("fragmentShader2").textContent;
@@ -195,6 +120,8 @@ function Sphere(options) {
     });
 
     var lMaterial2 = lMaterial.clone();
+    lMaterial2.uniforms.waveVA = this.waveVA2;
+    lMaterial2.uniforms.waveHA = this.waveHA2;
     lMaterial2.uniforms.sColor = this.c2;
     lMaterial2.uniforms.gRS = this.gRS2;
 
@@ -239,9 +166,6 @@ Sphere.prototype.updateCircleScales = function() {
     this.cScales.fill(0, this.nCircles);
 };
 
-Sphere.prototype.updateCircleSW = function() {
-};
-
 // may reuse circle scale calcs here?
 Sphere.prototype.updateLineVertices = function() {
     this.lVertices[0] = 0;
@@ -274,16 +198,15 @@ Sphere.prototype.updateLineRotations = function() {
 };
 
 // hide extra line vertices (use alpha or try scaling down)
-Sphere.prototype.updateLineAlphas = function() {
-    this.lAlphas.fill(1, 0, this.nLines);
-    this.lAlphas.fill(0, this.nLines, this.MAX_LINES);
+Sphere.prototype.updateLineDisplayParams = function() {
+    this.lDisplayParams.fill(1, 0, this.nLines);
+    this.lDisplayParams.fill(0, this.nLines, this.MAX_LINES);
 };
 
 // called on nCircles change
-// review this
-Sphere.prototype.updateCIGAttrs = function() {
-    this.nLines = this.nCircles * 2;
-
+// review
+Sphere.prototype.updateIGAttrs = function(n) {
+    if (n !== undefined) this.nCircles = n;
     this.updateCircleVertices();
     this.updateCircleOffsets();
     this.updateCircleScales();
@@ -291,82 +214,114 @@ Sphere.prototype.updateCIGAttrs = function() {
     this.cig.attributes.offset.needsUpdate = true;
     this.cig.attributes.scale.needsUpdate = true;
 
+    this.nLines = this.nCircles * 2;
     this.updateLineVertices();
     this.updateLineRotations();
-    this.updateLineAlphas();
+    this.updateLineDisplayParams();
     this.lig.attributes.position.needsUpdate = true;
     this.lig.attributes.rotation.needsUpdate = true;
-    this.lig.attributes.alphaParam.needsUpdate = true;
+    this.lig.attributes.displayParam.needsUpdate = true;
 };
 
 Sphere.prototype.timedUpdate = function(ms) {
-    //if (!this.lastUpdateMS) this.lastUpdateMS = Date.now();
-    //this.cMesh.material.uniforms.time.value = (Date.now() / 1000) % 10; // period: 2s
-    //this.cMesh2.material.uniforms.time.value = (Date.now() / 1000) % 10;
-
-    /*
-    this.lMesh.material.uniforms.time.value = (Date.now() / 1000) % 20;
-    this.lMesh2.material.uniforms.time.value = (Date.now() / 1000) % 19;
-    this.updateCIGAttrs();
-    */
-
     this.scheduler.runTasks();
-    this.lMesh.material.uniforms.gRS.value = (this.timer.get("cgRS") + this.timer.get("gRS")) % (2 * Math.PI);
-    this.lMesh2.material.uniforms.gRS.value = (this.timer.get("cgRS") + this.timer.get("gRS2")) % (2 * Math.PI);
-    this.lMesh3.material.uniforms.gRS.value = (this.timer.get("cgRS") + this.timer.get("gRS3")) % (2 * Math.PI);
+    //this.cMesh.material.uniforms.time.value = (Date.now() / 1000) % 20; // repeats every 20s
+    //this.cMesh.material.uniforms.gRS.value = (this.timer.get("cgRS") + this.timer.get("gRS")) % (2 * Math.PI);
+    //this.cMesh.material.uniforms.waveVA.value = this.timer.get("waveVA");
+
+    var ns = (Date.now() / 1000) % 20;
+    var cgRS = this.timer.get("cgRS");
+    var rMod = 2 * Math.PI;
+
+    // rm
+    var waveVA = this.timer.get("waveVA");
+    var waveHA = this.timer.get("waveHA");
+
+    this.lMesh.material.uniforms.time.value = ns;
+    this.lMesh2.material.uniforms.time.value = ns;
+    this.lMesh3.material.uniforms.time.value = ns;
+    this.lMesh.material.uniforms.gRS.value = (cgRS + this.timer.get("gRS")) % rMod;
+    this.lMesh2.material.uniforms.gRS.value = (cgRS + this.timer.get("gRS2")) % rMod;
+    this.lMesh3.material.uniforms.gRS.value = (cgRS + this.timer.get("gRS3")) % rMod;
+    this.lMesh.material.uniforms.waveVA.value = this.timer.get("waveVA");
+    this.lMesh2.material.uniforms.waveVA.value = this.timer.get("waveVA2");
+    this.lMesh3.material.uniforms.waveVA.value = waveVA;
+    this.lMesh.material.uniforms.waveHA.value = this.timer.get("waveHA");
+    this.lMesh2.material.uniforms.waveHA.value = this.timer.get("waveHA2");
+    this.lMesh3.material.uniforms.waveHA.value = waveHA;
+
+    // vertex updates
+    var circles = Math.floor(this.timer.get("nCircles")) || this.nCircles;
+    if (circles != this.nCircles) this.updateIGAttrs(circles);
 };
 
 Sphere.prototype.startAnimation = function() {
     var self = this;
 
-    // constant stuff
-    self.timer.addTransition({
-        key: "cgRS",
-        rate: 2 * Math.PI / (1000 * 20), // radians per ms
-        type: "constant"
-    });
-
-    var mainCB = function(scheduler, now) {
-        scheduler.addTask({ 
-            condition: now + 10000,
-            runCallback: mainCB
-        });
-
+    // 12000 (~4000)
+    var spinCB = function(scheduler, now) {
+        scheduler.addTask({ condition: now + 12000, runCallback: spinCB });
         var gRS = self.timer.get("gRS", now);
         if (gRS === null) gRS = 0;
-        self.timer.addTransition({
-            key: "gRS",
-            duration: 5000,
-            startVal: gRS,
-            endVal: gRS + 2 * Math.PI,
-            type: "iosine"
-        });
+        self.timer.addTransition({ key: "gRS", duration: 8200, startVal: gRS, endVal: gRS + 2 * Math.PI, type: "iosine" });
 
         var gRS2 = self.timer.get("gRS2", now);
         if (gRS2 === null) gRS2 = 0;
-        self.timer.addTransition({
-            key: "gRS2",
-            duration: 5050,
-            startVal: gRS2,
-            endVal: gRS2 + 2 * Math.PI,
-            type: "iosine"
-        });
+        self.timer.addTransition({ key: "gRS2", duration: 8220, startVal: gRS2, endVal: gRS2 + 2 * Math.PI, type: "iosine" });
 
         var gRS3 = self.timer.get("gRS3", now);
         if (gRS3 === null) gRS3 = 0;
-        self.timer.addTransition({
-            key: "gRS3",
-            duration: 5120,
-            startVal: gRS3,
-            endVal: gRS3 + 2 * Math.PI,
-            type: "iosine"
-        });
+        self.timer.addTransition({ key: "gRS3", duration: 8250, startVal: gRS3, endVal: gRS3 + 2 * Math.PI, type: "iosine" });
     };
 
+    // 12200 (5600)
+    var vwaveCB = function(scheduler, now) {
+        scheduler.addTask({ condition: now + 2200, runCallback: vwaveCB2 });
+        self.timer.addTransition({ key: "waveVA", duration: 1900, startVal: 0, endVal: 0.06, type: "iosine" });
+        self.timer.addTransition({ key: "waveVA2", duration: 2200, startVal: 0, endVal: 0.06, type: "iosine" });
+    };
+    var vwaveCB2 = function(scheduler, now) {
+        scheduler.addTask({ condition: now + 10000, runCallback: vwaveCB });
+        var waveVA = self.timer.get("waveVA", now) || 0;
+        self.timer.addTransition({ key: "waveVA", duration: 3800, startVal: waveVA, endVal: 0, type: "iosine" });
+        var waveVA2 = self.timer.get("waveVA2", now) || 0;
+        self.timer.addTransition({ key: "waveVA2", duration: 4400, startVal: waveVA, endVal: 0, type: "iosine" });
+    };
+
+    // 24400
+    var hwaveCB = function(scheduler, now) {
+        scheduler.addTask({ condition: now + 2200, runCallback: hwaveCB2 });
+        self.timer.addTransition({ key: "waveHA", duration: 1900, startVal: 0, endVal: 0.006, type: "iosine" });
+        self.timer.addTransition({ key: "waveHA2", duration: 2200, startVal: 0, endVal: 0.006, type: "iosine" });
+    };
+    var hwaveCB2 = function(scheduler, now) {
+        scheduler.addTask({ condition: now + 22200, runCallback: hwaveCB });
+        var waveHA = self.timer.get("waveHA", now) || 0;
+        self.timer.addTransition({ key: "waveHA", duration: 4000, startVal: waveHA, endVal: 0, type: "iosine" });
+        var waveHA2 = self.timer.get("waveHA2", now) || 0;
+        self.timer.addTransition({ key: "waveHA2", duration: 4600, startVal: waveHA2, endVal: 0, type: "iosine" });
+    };
+
+    var circleCB = function(scheduler, now) {
+        scheduler.addTask({ condition: now + 12000, runCallback: circleCB2 });
+        var nCircles = self.timer.get("nCircles", now);
+        if (nCircles === null) nCircles = self.nCircles;
+        self.timer.addTransition({ key: "nCircles", duration: 1000, startVal: nCircles, endVal: 75, type: "linear" });
+    };
+    var circleCB2 = function(scheduler, now) {
+        scheduler.addTask({ condition: now + 12000, runCallback: circleCB });
+        var nCircles = self.timer.get("nCircles", now);
+        if (nCircles === null) nCircles = self.nCircles;
+        self.timer.addTransition({ key: "nCircles", duration: 1000, startVal: nCircles, endVal: 25, type: "linear" });
+    };
+
+    // constant stuff
+    this.timer.addTransition({ key: "cgRS", rate: 2 * Math.PI / (1000 * 40), type: "constant" });
+
     var now = Date.now();
-    this.scheduler.addTask({
-        condition: now + 1000,
-        runCallback: mainCB
-    });
+    this.scheduler.addTask({ condition: now + 3000, runCallback: vwaveCB });
+    this.scheduler.addTask({ condition: now + 15200, runCallback: hwaveCB });
+    this.scheduler.addTask({ condition: now + 1000, runCallback: spinCB });
+    this.scheduler.addTask({ condition: now + 1400, runCallback: circleCB });
 };
 
