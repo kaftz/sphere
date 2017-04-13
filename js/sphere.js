@@ -2,7 +2,7 @@ function Sphere(options) {
     this.options = options || {};
     
     // constants
-    this.MAX_CIRCLES = 151;
+    this.MAX_CIRCLES = 101;
     this.MAX_LINES = this.MAX_CIRCLES * 2;
 
     // timing
@@ -316,7 +316,7 @@ Sphere.prototype.startAnimation = function() {
         scheduler.addTask({ condition: now + 14000, runCallback: circleCB3 });
         var nCircles = self.timer.get("nCircles", now);
         if (nCircles === null) nCircles = self.nCircles;
-        self.timer.addTransition({ key: "nCircles", duration: 1000, startVal: nCircles, endVal: 151, type: "linear" });
+        self.timer.addTransition({ key: "nCircles", duration: 1000, startVal: nCircles, endVal: 101, type: "linear" });
     };
     var circleCB3 = function(scheduler, now) {
         scheduler.addTask({ condition: now + 12000, runCallback: circleCB });

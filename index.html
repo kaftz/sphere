@@ -172,9 +172,11 @@
             //orbit = new THREE.OrbitControls(camera, renderer.domElement);
             //orbit.enableZoom = false;
 
+            /*
             stats = new Stats();
             stats.domElement.setAttribute("id", "stats");
             document.body.appendChild(stats.domElement);
+            */
 
             sphere.startAnimation();
 
@@ -184,10 +186,10 @@
         }
 
         function run() {
-            stats.begin();
+            //stats.begin();
             sphere.update();
             renderer.render(scene, camera);
-            stats.end();
+            //stats.end();
             requestAnimationFrame(run);
         }
 
