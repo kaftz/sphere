@@ -139,8 +139,8 @@
             var width = window.innerWidth;
             var height = window.innerHeight;
             camera = new THREE.PerspectiveCamera(40, width/height, 10, 200);
-            camera.position.y = 40;
-            camera.position.z = 40;
+            camera.position.y = 32;
+            camera.position.z = 32;
             camera.lookAt(new THREE.Vector3(0, 0, 0));
 
             scene = new THREE.Scene();
@@ -151,13 +151,14 @@
             //scene.add(sphere.cMesh2);
             scene.add(sphere.lMesh);
             scene.add(sphere.lMesh2);
-            //scene.add(sphere.lMesh3);
+            scene.add(sphere.lMesh3);
 
-            // init gui
+            /*
             gui = new dat.GUI();
             gui.add(sphere, "nCircles", 3, 91).step(1).onChange(function() {
                 sphere.updateIGAttrs();
             });
+            */
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setPixelRatio(window.devicePixelRatio);

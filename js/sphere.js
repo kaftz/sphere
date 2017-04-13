@@ -13,8 +13,6 @@ function Sphere(options) {
     this.cSegments = 128;
     this.nCircles = this.options.nCircles || 25;
     this.nLines = this.nCircles * 2;
-
-    // wave params (calc time interval)
     this.waveVN = 10;
     this.waveHN = 20;
 
@@ -22,7 +20,7 @@ function Sphere(options) {
     this.alpha = { value: 1 }; // multiply blending w/ alpha?
     this.c1 = { value: new THREE.Vector3(0, 0, 0) };
     this.c2 = { value: new THREE.Vector3(0.4, 0.4, 0.8) };
-    this.c3 = { value: new THREE.Vector3(0.8, 0.8, 0.8) };
+    this.c3 = { value: new THREE.Vector3(0.6, 0.9, 1.0) };
     this.gRS = { value: 0 }; // radians
     this.gRS2 = { value: 0 };
     this.gRS3 = { value: 0 }; 
@@ -30,12 +28,14 @@ function Sphere(options) {
     // wave uniforms
     this.waveVA = { value: 0 };
     this.waveVA2 = { value: 0 };
+    this.waveVA3 = { value: 0 };
     this.waveVF = { value: 2 * Math.PI / (2 * this.radius / this.waveVN) };
-    this.waveVS = { value: 4 * 2 * Math.PI }; // repeats every 2s
+    this.waveVS = { value: 4 * 2 * Math.PI }; // repeats every 0.25s
     this.waveHA = { value: 0 };
     this.waveHA2 = { value: 0 };
+    this.waveHA3 = { value: 0 };
     this.waveHF = { value: this.waveHN };
-    this.waveHS = { value: 8 * 2 * Math.PI / 2 };
+    this.waveHS = { value: 4 * 2 * Math.PI };
 
     // attributes
     // previously allocated attrs based on nCircles
@@ -126,6 +126,8 @@ function Sphere(options) {
     lMaterial2.uniforms.gRS = this.gRS2;
 
     var lMaterial3 = lMaterial.clone();
+    lMaterial2.uniforms.waveVA = this.waveVA3;
+    lMaterial2.uniforms.waveHA = this.waveHA3;
     lMaterial3.uniforms.sColor = this.c3;
     lMaterial3.uniforms.gRS = this.gRS3;
 
@@ -134,7 +136,6 @@ function Sphere(options) {
     this.lMesh3 = new THREE.Line(this.lig, lMaterial3); 
 }
 
-// move radius adjustment to vs?
 // cw along xz
 Sphere.prototype.updateCircleVertices = function() {
     var thetaStep = 2 * Math.PI / this.cSegments;
@@ -146,8 +147,7 @@ Sphere.prototype.updateCircleVertices = function() {
 };
 
 // higher attr indices should be cleared when nCircles is scaled down
-// probably can't optimize this much without moving to vs
-// does this have to be a vec3?
+// replace vec3 (?), might be able to move calc to vs
 Sphere.prototype.updateCircleOffsets = function() {
     var cOffsetStep = 2 * this.radius / (this.nCircles + 1);
     for (var i = 0; i < this.nCircles; i++) {
@@ -166,7 +166,7 @@ Sphere.prototype.updateCircleScales = function() {
     this.cScales.fill(0, this.nCircles);
 };
 
-// may reuse circle scale calcs here?
+// re-using circle scales here
 Sphere.prototype.updateLineVertices = function() {
     this.lVertices[0] = 0;
     this.lVertices[1] = this.radius;
@@ -197,7 +197,6 @@ Sphere.prototype.updateLineRotations = function() {
     this.lRotations.fill(0, this.nLines);
 };
 
-// hide extra line vertices (use alpha or try scaling down)
 Sphere.prototype.updateLineDisplayParams = function() {
     this.lDisplayParams.fill(1, 0, this.nLines);
     this.lDisplayParams.fill(0, this.nLines, this.MAX_LINES);
@@ -207,12 +206,12 @@ Sphere.prototype.updateLineDisplayParams = function() {
 // review
 Sphere.prototype.updateIGAttrs = function(n) {
     if (n !== undefined) this.nCircles = n;
-    this.updateCircleVertices();
+    //this.updateCircleVertices();
     this.updateCircleOffsets();
     this.updateCircleScales();
-    this.cig.attributes.position.needsUpdate = true;
-    this.cig.attributes.offset.needsUpdate = true;
-    this.cig.attributes.scale.needsUpdate = true;
+    //this.cig.attributes.position.needsUpdate = true;
+    //this.cig.attributes.offset.needsUpdate = true;
+    //this.cig.attributes.scale.needsUpdate = true;
 
     this.nLines = this.nCircles * 2;
     this.updateLineVertices();
@@ -233,10 +232,6 @@ Sphere.prototype.timedUpdate = function(ms) {
     var cgRS = this.timer.get("cgRS");
     var rMod = 2 * Math.PI;
 
-    // rm
-    var waveVA = this.timer.get("waveVA");
-    var waveHA = this.timer.get("waveHA");
-
     this.lMesh.material.uniforms.time.value = ns;
     this.lMesh2.material.uniforms.time.value = ns;
     this.lMesh3.material.uniforms.time.value = ns;
@@ -245,10 +240,10 @@ Sphere.prototype.timedUpdate = function(ms) {
     this.lMesh3.material.uniforms.gRS.value = (cgRS + this.timer.get("gRS3")) % rMod;
     this.lMesh.material.uniforms.waveVA.value = this.timer.get("waveVA");
     this.lMesh2.material.uniforms.waveVA.value = this.timer.get("waveVA2");
-    this.lMesh3.material.uniforms.waveVA.value = waveVA;
+    this.lMesh3.material.uniforms.waveVA.value = this.timer.get("waveVA3");
     this.lMesh.material.uniforms.waveHA.value = this.timer.get("waveHA");
     this.lMesh2.material.uniforms.waveHA.value = this.timer.get("waveHA2");
-    this.lMesh3.material.uniforms.waveHA.value = waveHA;
+    this.lMesh3.material.uniforms.waveHA.value = this.timer.get("waveHA3");
 
     // vertex updates
     var circles = Math.floor(this.timer.get("nCircles")) || this.nCircles;
@@ -258,9 +253,9 @@ Sphere.prototype.timedUpdate = function(ms) {
 Sphere.prototype.startAnimation = function() {
     var self = this;
 
-    // 12000 (~4000)
+    // 12200
     var spinCB = function(scheduler, now) {
-        scheduler.addTask({ condition: now + 12000, runCallback: spinCB });
+        scheduler.addTask({ condition: now + 12200, runCallback: spinCB });
         var gRS = self.timer.get("gRS", now);
         if (gRS === null) gRS = 0;
         self.timer.addTransition({ key: "gRS", duration: 8200, startVal: gRS, endVal: gRS + 2 * Math.PI, type: "iosine" });
@@ -277,33 +272,40 @@ Sphere.prototype.startAnimation = function() {
     // 12200 (5600)
     var vwaveCB = function(scheduler, now) {
         scheduler.addTask({ condition: now + 2200, runCallback: vwaveCB2 });
-        self.timer.addTransition({ key: "waveVA", duration: 1900, startVal: 0, endVal: 0.06, type: "iosine" });
-        self.timer.addTransition({ key: "waveVA2", duration: 2200, startVal: 0, endVal: 0.06, type: "iosine" });
+        self.timer.addTransition({ key: "waveVA", duration: 1800, startVal: 0, endVal: 0.06, type: "iosine" });
+        self.timer.addTransition({ key: "waveVA2", duration: 2000, startVal: 0, endVal: 0.06, type: "iosine" });
+        self.timer.addTransition({ key: "waveVA3", duration: 2200, startVal: 0, endVal: 0.06, type: "iosine" });
     };
     var vwaveCB2 = function(scheduler, now) {
         scheduler.addTask({ condition: now + 10000, runCallback: vwaveCB });
         var waveVA = self.timer.get("waveVA", now) || 0;
-        self.timer.addTransition({ key: "waveVA", duration: 3800, startVal: waveVA, endVal: 0, type: "iosine" });
+        self.timer.addTransition({ key: "waveVA", duration: 3600, startVal: waveVA, endVal: 0, type: "iosine" });
         var waveVA2 = self.timer.get("waveVA2", now) || 0;
-        self.timer.addTransition({ key: "waveVA2", duration: 4400, startVal: waveVA, endVal: 0, type: "iosine" });
+        self.timer.addTransition({ key: "waveVA2", duration: 3900, startVal: waveVA2, endVal: 0, type: "iosine" });
+        var waveVA3 = self.timer.get("waveVA3", now) || 0;
+        self.timer.addTransition({ key: "waveVA3", duration: 4200, startVal: waveVA3, endVal: 0, type: "iosine" });
     };
 
     // 24400
     var hwaveCB = function(scheduler, now) {
         scheduler.addTask({ condition: now + 2200, runCallback: hwaveCB2 });
-        self.timer.addTransition({ key: "waveHA", duration: 1900, startVal: 0, endVal: 0.006, type: "iosine" });
-        self.timer.addTransition({ key: "waveHA2", duration: 2200, startVal: 0, endVal: 0.006, type: "iosine" });
+        self.timer.addTransition({ key: "waveHA", duration: 1800, startVal: 0, endVal: 0.006, type: "iosine" });
+        self.timer.addTransition({ key: "waveHA2", duration: 2000, startVal: 0, endVal: 0.006, type: "iosine" });
+        self.timer.addTransition({ key: "waveHA3", duration: 2200, startVal: 0, endVal: 0.006, type: "iosine" });
     };
     var hwaveCB2 = function(scheduler, now) {
         scheduler.addTask({ condition: now + 22200, runCallback: hwaveCB });
         var waveHA = self.timer.get("waveHA", now) || 0;
-        self.timer.addTransition({ key: "waveHA", duration: 4000, startVal: waveHA, endVal: 0, type: "iosine" });
+        self.timer.addTransition({ key: "waveHA", duration: 3600, startVal: waveHA, endVal: 0, type: "iosine" });
         var waveHA2 = self.timer.get("waveHA2", now) || 0;
-        self.timer.addTransition({ key: "waveHA2", duration: 4600, startVal: waveHA2, endVal: 0, type: "iosine" });
+        self.timer.addTransition({ key: "waveHA2", duration: 3900, startVal: waveHA2, endVal: 0, type: "iosine" });
+        var waveHA3 = self.timer.get("waveHA3", now) || 0;
+        self.timer.addTransition({ key: "waveHA3", duration: 4200, startVal: waveHA3, endVal: 0, type: "iosine" });
     };
 
+    // 34000
     var circleCB = function(scheduler, now) {
-        scheduler.addTask({ condition: now + 12000, runCallback: circleCB2 });
+        scheduler.addTask({ condition: now + 22000, runCallback: circleCB2 });
         var nCircles = self.timer.get("nCircles", now);
         if (nCircles === null) nCircles = self.nCircles;
         self.timer.addTransition({ key: "nCircles", duration: 1000, startVal: nCircles, endVal: 75, type: "linear" });
@@ -316,12 +318,12 @@ Sphere.prototype.startAnimation = function() {
     };
 
     // constant stuff
-    this.timer.addTransition({ key: "cgRS", rate: 2 * Math.PI / (1000 * 40), type: "constant" });
+    this.timer.addTransition({ key: "cgRS", rate: 2 * Math.PI / (1000 * 30), type: "constant" });
 
     var now = Date.now();
+    this.scheduler.addTask({ condition: now + 1000, runCallback: spinCB });
     this.scheduler.addTask({ condition: now + 3000, runCallback: vwaveCB });
     this.scheduler.addTask({ condition: now + 15200, runCallback: hwaveCB });
-    this.scheduler.addTask({ condition: now + 1000, runCallback: spinCB });
     this.scheduler.addTask({ condition: now + 1400, runCallback: circleCB });
 };
 
