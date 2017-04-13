@@ -2,7 +2,7 @@ function Sphere(options) {
     this.options = options || {};
     
     // constants
-    this.MAX_CIRCLES = 91;
+    this.MAX_CIRCLES = 151;
     this.MAX_LINES = this.MAX_CIRCLES * 2;
 
     // timing
@@ -305,14 +305,20 @@ Sphere.prototype.startAnimation = function() {
         self.timer.addTransition({ key: "waveHA3", duration: 4200, startVal: waveHA3, endVal: 0, type: "iosine" });
     };
 
-    // 34000
+    // 40000
     var circleCB = function(scheduler, now) {
-        scheduler.addTask({ condition: now + 22000, runCallback: circleCB2 });
+        scheduler.addTask({ condition: now + 14000, runCallback: circleCB2 });
         var nCircles = self.timer.get("nCircles", now);
         if (nCircles === null) nCircles = self.nCircles;
         self.timer.addTransition({ key: "nCircles", duration: 1000, startVal: nCircles, endVal: 75, type: "linear" });
     };
     var circleCB2 = function(scheduler, now) {
+        scheduler.addTask({ condition: now + 14000, runCallback: circleCB3 });
+        var nCircles = self.timer.get("nCircles", now);
+        if (nCircles === null) nCircles = self.nCircles;
+        self.timer.addTransition({ key: "nCircles", duration: 1000, startVal: nCircles, endVal: 151, type: "linear" });
+    };
+    var circleCB3 = function(scheduler, now) {
         scheduler.addTask({ condition: now + 12000, runCallback: circleCB });
         var nCircles = self.timer.get("nCircles", now);
         if (nCircles === null) nCircles = self.nCircles;

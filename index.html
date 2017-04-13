@@ -121,7 +121,13 @@
         var testCanvas = document.createElement("canvas");
         var testContext = testCanvas.getContext("webgl") || testCanvas.getContext("experimental-webgl");
         var webGL = !!(window.WebGLRenderingContext && testContext);
+
         var camera, scene, renderer, orbit, stats, gui, sphere;
+        var width = window.innerWidth;
+        var height = window.innerHeight;
+        var camX = 0;
+        var camY = 32;
+        var camZ = 32;
 
         if (webGL && testContext.getExtension("ANGLE_instanced_arrays")) {
             setup();
@@ -136,11 +142,9 @@
         }
 
         function setup() {
-            var width = window.innerWidth;
-            var height = window.innerHeight;
             camera = new THREE.PerspectiveCamera(40, width/height, 10, 200);
-            camera.position.y = 32;
-            camera.position.z = 32;
+            camera.position.y = camY;
+            camera.position.z = camZ;
             camera.lookAt(new THREE.Vector3(0, 0, 0));
 
             scene = new THREE.Scene();
@@ -155,7 +159,7 @@
 
             /*
             gui = new dat.GUI();
-            gui.add(sphere, "nCircles", 3, 91).step(1).onChange(function() {
+            gui.add(sphere, "nCircles", 3, sphere.MAX_CIRCLES).step(1).onChange(function() {
                 sphere.updateIGAttrs();
             });
             */
@@ -165,7 +169,7 @@
             renderer.setSize(width, height);
             document.body.appendChild(renderer.domElement);
 
-            orbit = new THREE.OrbitControls(camera, renderer.domElement);
+            //orbit = new THREE.OrbitControls(camera, renderer.domElement);
             //orbit.enableZoom = false;
 
             stats = new Stats();
@@ -176,6 +180,7 @@
 
             // add event handlers
             window.addEventListener("resize", onResize, false);
+            window.addEventListener("mousemove", onMousemove, false);
         }
 
         function run() {
@@ -187,11 +192,16 @@
         }
 
         function onResize() {
-            var width = window.innerWidth;
-            var height = window.innerHeight;
+            width = window.innerWidth;
+            height = window.innerHeight;
             camera.aspect = width / height;
             camera.updateProjectionMatrix();
             renderer.setSize(width, height);
+        }
+
+        function onMousemove(e) {
+            camera.position.x = camX - (width / 2 - e.clientX) * 0.4 / width;
+            camera.position.y = camY + (height / 2 - e.clientY) * 0.4 / height;
         }
     </script>
 </body>
