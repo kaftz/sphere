@@ -222,7 +222,7 @@ Sphere.prototype.updateIGAttrs = function(n) {
     this.lig.attributes.displayParam.needsUpdate = true;
 };
 
-Sphere.prototype.timedUpdate = function(ms) {
+Sphere.prototype.update = function() {
     this.scheduler.runTasks();
     //this.cMesh.material.uniforms.time.value = (Date.now() / 1000) % 20; // repeats every 20s
     //this.cMesh.material.uniforms.gRS.value = (this.timer.get("cgRS") + this.timer.get("gRS")) % (2 * Math.PI);
@@ -255,6 +255,7 @@ Sphere.prototype.startAnimation = function() {
     var self = this;
 
     // 12200
+    // reset gRS vals?
     var spinCB = function(scheduler, now) {
         scheduler.addTask({ condition: now + 12200, runCallback: spinCB });
         var gRS = self.timer.get("gRS", now);

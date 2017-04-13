@@ -178,11 +178,9 @@
             window.addEventListener("resize", onResize, false);
         }
 
-        var log = false;
-
         function run() {
             stats.begin();
-            sphere.timedUpdate();
+            sphere.update();
             renderer.render(scene, camera);
             stats.end();
             requestAnimationFrame(run);
