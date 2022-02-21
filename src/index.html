@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>sphere</title>
+    <title>Sphere</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <style>
@@ -46,7 +46,7 @@
             // 0 to 2 * coeff.
             float waveComponent = (1.0 + sin(waveVF * offset.y + waveVS * time)) * waveVA;
 
-            // this is semi-static, faking y-rotation
+            // This is semi-static, faking y-rotation
             float theta = atan(position.z, position.x) + gRS;
             float waveComponent2 = (1.0 + sin(waveHF * theta + waveHS * time)) * waveHA;
 
@@ -77,7 +77,7 @@
             float waveComponent = (1.0 + sin(waveVF * position.y + waveVS * time)) * waveVA;
             float waveComponent2 = (1.0 + sin(waveHF * -rotation + waveHS * time)) * waveHA;
 
-            // review
+            // TODO: Review
             ap.x = position.x * (waveComponent + waveComponent2 + 1.0) * displayParam;
             ap.y = position.y - (position.y - 10.0) * iflt(displayParam, 0.5); // rad: 10.0
 
@@ -91,7 +91,7 @@
         }
 
         float ifgt(float x, float y) {
-            return max(sign(x - y), 0.0); // comparing floats?
+            return max(sign(x - y), 0.0); // Comparing floats?
         }
 
         float iflt(float x, float y) {
